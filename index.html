@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>삼차방정식의 근과 계수와의 관계, 켤레근</title>
+  <style>
+    body {
+      background-color: #fff;
+      color: #000;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0 auto;
+      max-width: 900px;
+    }
+    h1 {
+      margin-top: 1.5em;
+    }
+    .centered {
+      text-align: center;
+      margin: 0.5em auto;
+    }
+    .energy-bar {
+      width: 200px;
+      height: 20px;
+      background-color: #ccc;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+    }
+    .energy-bar-fill {
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+      transition: width 1s linear;
+    }
+    .hidden {
+      display: none;
+    }
+    .question-container {
+      margin-top: 1em;
+      border: 1px solid #000;
+      padding: 1em;
+      text-align: left;
+    }
+    .choice {
+      margin: 0.5em 0;
+    }
+    button {
+      margin: 0.5em;
+      padding: 0.5em 1em;
+      background-color: #fff;
+      color: #000;
+      border: 1px solid #000;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #eee;
+    }
+    #response {
+      white-space: pre;
+      text-align: left;
+      margin: 1em auto;
+      width: 90%;
+      border: 1px solid #000;
+      padding: 0.5em;
+    }
+    /* 분수 표시용 CSS */
+    .frac {
+      display: inline-block;
+      text-align: center;
+      vertical-align: middle;
+      margin: 0 2px;
+    }
+    .frac .top {
+      display: block;
+      border-bottom: 1px solid #000;
+      padding: 0 2px;
+    }
+    .frac .bottom {
+      display: block;
+      padding: 0 2px;
+    }
+  </style>
+</head>
+<body>
+<h1>삼차방정식의 근과 계수와의 관계, 켤레근</h1>
+
+<!-- 시작 화면 -->
+<div id="startScreen" class="centered">
+  <div style="margin-bottom:1em;">
+    <label>이름:
+      <input type="text" id="playerName" style="margin-left:5px;text-align:center;"/>
+    </label>
+  </div>
+  <div style="margin-bottom:1em;">
+    <label>난이도 선택:</label>
+    <select id="difficultySelect">
+      <option value="hardest">최상</option>
+      <option value="hard">상</option>
+      <option value="medium">중</option>
+      <option value="easy">하</option>
+    </select>
+  </div>
+  <button onclick="startGame()">게임 시작</button>
+</div>
+
+<!-- 게임 화면 -->
+<div id="gameScreen" class="hidden">
+  <div id="infoBar" class="centered">
+    <div>남은 기회: <span id="lives">3</span></div>
+    <div>현재 점수: <span id="score">0</span></div>
+    <div>게임 진행 시간: <span id="elapsed">0</span> 초</div>
+    <div id="energyContainer" class="hidden" style="margin-top:5px;">
+      <div class="energy-bar">
+        <div class="energy-bar-fill" id="energyBarFill"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="questionArea" class="question-container">
+    <!-- 문제와 선택지 표시 영역 -->
+  </div>
+
+  <div id="feedback" style="margin:1em;"></div>
+</div>
+
+<!-- 게임 종료 화면 -->
+<div id="endScreen" class="hidden">
+  <h2>게임 종료</h2>
+  <p>최종 점수: <span id="finalScore">0</span></p>
+  <p>총 소요 시간: <span id="finalTime">0</span> 초</p>
+
+  <button onclick="sendScore()">점수 전송</button>
+
+  <div id="response"></div>
+</div>
+
+<script>
+// ===== 문제 데이터 =====
+// "방정식을 구하시오" 유형 문제에서는 보기(choice) 뒤에 "= 0"을 붙였습니다.
+// 근의 합·곱 등 값만 묻는 문제는 기존대로 유지.
+
+const problems = [
+  // 1) 값만 묻는 예시
+  {
+    question: "x<sup>3</sup> - 3x<sup>2</sup> + 3x + 1 = 0 의 세 근 (α, β, γ)에 대하여, α + β + γ 를 구하시오.",
+    choices: ["2", "4", "3", "-2"],
+    correct: 2
+  },
+  {
+    question: "x<sup>3</sup> - 3x<sup>2</sup> + 3x + 1 = 0 의 세 근 (α, β, γ)에 대하여, αβ + βγ + γα 를 구하시오.",
+    choices: ["-3", "1", "0", "3"],
+    correct: 3
+  },
+  {
+    question: "x<sup>3</sup> - 3x<sup>2</sup> + 3x + 1 = 0 의 세 근 (α, β, γ)에 대하여, αβγ 를 구하시오.",
+    choices: [
+      "<span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span>",
+      "-1",
+      "1",
+      "-3"
+    ],
+    correct: 1
+  },
+
+  // … (중간 여러 문제 생략 가능) …
+
+  // 아래부터는 "방정식을 구하시오" 유형 => 각 보기 뒤에 "= 0" 명시
+  {
+    question: "세 수 -3, 1+2i, 1-2i 를 근으로 가지는, 계수가 1인 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - x<sup>2</sup> - x - 15 = 0",
+      "x<sup>3</sup> + x<sup>2</sup> - x - 15 = 0",
+      "x<sup>3</sup> + x<sup>2</sup> - x + 15 = 0",
+      "x<sup>3</sup> - x<sup>2</sup> + x + 15 = 0"
+    ],
+    correct: 2
+  },
+  {
+    question: "세 수 1, 3+√2, 3-√2 를 근으로 가지는, 계수가 1인 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - 5x<sup>2</sup> + 13x - 7 = 0",
+      "x<sup>3</sup> - 7x<sup>2</sup> + 13x - 7 = 0",
+      "x<sup>3</sup> + 7x<sup>2</sup> + 13x + 7 = 0",
+      "x<sup>3</sup> - 7x<sup>2</sup> - 13x - 7 = 0"
+    ],
+    correct: 1
+  },
+  {
+    question: "x<sup>3</sup> - 2x - 1 = 0 의 세 근 (α, β, γ)에 대하여, 새 근 (α+β), (β+γ), (γ+α)를 모두 근으로 가지는 계수가 1인 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - 2x + 1 = 0",
+      "x<sup>3</sup> + 2x - 1 = 0",
+      "x<sup>3</sup> - 2x - 1 = 0",
+      "x<sup>3</sup> + 2x + 1 = 0"
+    ],
+    correct: 0
+  },
+  {
+    question: "x<sup>3</sup> + 2x<sup>2</sup> + 4x - 2 = 0 의 세 근 (α, β, γ)에 대하여, 새 근 -α, -β, -γ 를 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - 2x<sup>2</sup> + 4x + 2 = 0",
+      "x<sup>3</sup> - 2x<sup>2</sup> + 4x - 2 = 0",
+      "x<sup>3</sup> - 2x<sup>2</sup> - 4x + 2 = 0",
+      "x<sup>3</sup> + 2x<sup>2</sup> + 4x + 2 = 0"
+    ],
+    correct: 0
+  },
+  {
+    question: "x<sup>3</sup> + 2x<sup>2</sup> + 4x - 2 = 0 의 세 근 (α, β, γ)에 대하여, 새 근 α+1, β+1, γ+1 을 모두 근으로 가지는 계수가 1인 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - x<sup>2</sup> + 4x + 5 = 0",
+      "x<sup>3</sup> - x<sup>2</sup> + 3x - 5 = 0",
+      "x<sup>3</sup> + x<sup>2</sup> + 3x - 5 = 0",
+      "x<sup>3</sup> - x<sup>2</sup> - 3x + 5 = 0"
+    ],
+    correct: 1
+  },
+  {
+    question: "x<sup>3</sup> + 2x<sup>2</sup> + 4x - 2 = 0 의 세 근 (α, β, γ)에 대하여, 새 근 αβ, βγ, γα 를 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> + 4x<sup>2</sup> + 4x - 4 = 0",
+      "x<sup>3</sup> - 4x<sup>2</sup> - 4x - 4 = 0",
+      "x<sup>3</sup> + 4x<sup>2</sup> - 4x - 4 = 0",
+      "x<sup>3</sup> - 4x<sup>2</sup> + 4x - 4 = 0"
+    ],
+    correct: 1
+  },
+  {
+    question: "x<sup>3</sup> + 2x<sup>2</sup> + 4x - 2 = 0 의 세 근 (α, β, γ)에 대하여, 새 근 1/α, 1/β, 1/γ 를 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - 2x<sup>2</sup> - x - <span class='frac'><span class='top'>1</span><span class='bottom'>2</span></span> = 0",
+      "x<sup>3</sup> - 2x<sup>2</sup> - x + <span class='frac'><span class='top'>1</span><span class='bottom'>2</span></span> = 0",
+      "x<sup>3</sup> + 2x<sup>2</sup> + x - <span class='frac'><span class='top'>1</span><span class='bottom'>2</span></span> = 0",
+      "x<sup>3</sup> - 2x<sup>2</sup> + x - <span class='frac'><span class='top'>1</span><span class='bottom'>2</span></span> = 0"
+    ],
+    correct: 0
+  },
+  {
+    question: "x<sup>3</sup> + 2x<sup>2</sup> + 4x - 2 = 0 의 세 근을 (α, β, γ)라 할 때, 새 근 (2α - 1), (2β - 1), (2γ - 1) 을 모두 근으로 가지는 계수가 1인 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> + 7x<sup>2</sup> + 27x - 5 = 0",
+      "x<sup>3</sup> + 7x<sup>2</sup> + 23x + 5 = 0",
+      "x<sup>3</sup> + 7x<sup>2</sup> + 27x + 5 = 0",
+      "x<sup>3</sup> + 7x<sup>2</sup> - 23x + 5 = 0"
+    ],
+    correct: 2
+  },
+  {
+    question: "x<sup>3</sup> + 2x<sup>2</sup> - x - 3 = 0 의 세 근을 (α, β, γ)라 할 때, 새 근 α+1, β+1, γ+1 을 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - x<sup>2</sup> + 2x + 1 = 0",
+      "x<sup>3</sup> + x<sup>2</sup> + 2x - 1 = 0",
+      "x<sup>3</sup> - x<sup>2</sup> - 2x - 1 = 0",
+      "x<sup>3</sup> + x<sup>2</sup> - 2x - 1 = 0"
+    ],
+    correct: 2
+  },
+  {
+    question: "x<sup>3</sup> + 2x<sup>2</sup> - x - 3 = 0 의 세 근 (α, β, γ)에 대하여, 새 근 1/α, 1/β, 1/γ 를 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - <span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span>x<sup>2</sup> + <span class='frac'><span class='top'>2</span><span class='bottom'>3</span></span>x - <span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span> = 0",
+      "x<sup>3</sup> + <span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span>x<sup>2</sup> - <span class='frac'><span class='top'>2</span><span class='bottom'>3</span></span>x + <span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span> = 0",
+      "x<sup>3</sup> - <span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span>x<sup>2</sup> - <span class='frac'><span class='top'>2</span><span class='bottom'>3</span></span>x + <span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span> = 0",
+      "x<sup>3</sup> + <span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span>x<sup>2</sup> - <span class='frac'><span class='top'>2</span><span class='bottom'>3</span></span>x - <span class='frac'><span class='top'>1</span><span class='bottom'>3</span></span> = 0"
+    ],
+    correct: 3
+  },
+  {
+    question: "x<sup>3</sup> + 3x<sup>2</sup> - 2x - 1 의 세 근 (α, β, γ)에 대하여, 새 근 -α, -β, -γ 를 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> + 3x<sup>2</sup> - 2x - 1 = 0",
+      "x<sup>3</sup> - 3x<sup>2</sup> + 2x - 1 = 0",
+      "x<sup>3</sup> - 3x<sup>2</sup> - 2x + 1 = 0",
+      "x<sup>3</sup> + 3x<sup>2</sup> + 2x + 1 = 0"
+    ],
+    correct: 2
+  },
+  {
+    question: "x<sup>3</sup> + 3x<sup>2</sup> - 2x - 1 의 세 근 (α, β, γ)에 대하여, 새 근 1/α, 1/β, 1/γ 를 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - 2x<sup>2</sup> + 3x - 1 = 0",
+      "x<sup>3</sup> + 2x<sup>2</sup> - 3x - 1 = 0",
+      "x<sup>3</sup> - 2x<sup>2</sup> - 3x + 1 = 0",
+      "x<sup>3</sup> + 2x<sup>2</sup> + 3x - 1 = 0"
+    ],
+    correct: 1
+  },
+  {
+    question: "x<sup>3</sup> - 3x<sup>2</sup> + x - 1 = 0 의 세 근이 (α, β, γ)라 할 때, 새 근 -α, -β, -γ 를 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> + 3x<sup>2</sup> - x - 1 = 0",
+      "x<sup>3</sup> - 3x<sup>2</sup> - x + 1 = 0",
+      "x<sup>3</sup> + 3x<sup>2</sup> + x + 1 = 0",
+      "x<sup>3</sup> - 3x<sup>2</sup> + x - 1 = 0"
+    ],
+    correct: 2
+  },
+  {
+    question: "x<sup>3</sup> - 3x<sup>2</sup> + x - 1 = 0 의 세 근 (α, β, γ)에 대하여, 새 근 1/α, 1/β, 1/γ 를 모두 근으로 가지는 삼차방정식을 구하시오.",
+    choices: [
+      "x<sup>3</sup> - x<sup>2</sup> + 3x - 1 = 0",
+      "x<sup>3</sup> - x<sup>2</sup> - 3x + 1 = 0",
+      "x<sup>3</sup> + x<sup>2</sup> + 3x - 1 = 0",
+      "x<sup>3</sup> + x<sup>2</sup> - 3x - 1 = 0"
+    ],
+    correct: 0
+  }
+];
+
+// ===== 난이도별 설정 =====
+let questionTimeLimit = 30; // 기본값
+let scorePerQuestion = 15;  // 기본값
+let infiniteTime = false;   // easy 모드(사실상 무제한)
+
+// ===== 전역 상태 =====
+let currentIndex = 0;     
+let lives = 3;           
+let score = 0;           
+let startTime = 0;       
+let elapsedTimer = null; 
+let questionTimer = null;
+let barWidth = 100;      
+let usedIndices = [];    
+let playerName = "";
+
+// 게임 시작
+function startGame() {
+  playerName = document.getElementById("playerName").value.trim();
+  if(!playerName) {
+    alert("이름을 입력하세요.");
+    return;
+  }
+  const diff = document.getElementById("difficultySelect").value;
+  switch(diff) {
+    case "hardest":
+      questionTimeLimit = 20;
+      scorePerQuestion = 20;
+      infiniteTime = false;
+      break;
+    case "hard":
+      questionTimeLimit = 30;
+      scorePerQuestion = 15;
+      infiniteTime = false;
+      break;
+    case "medium":
+      questionTimeLimit = 40;
+      scorePerQuestion = 13;
+      infiniteTime = false;
+      break;
+    case "easy":
+      questionTimeLimit = 999999;
+      scorePerQuestion = 10;
+      infiniteTime = true;
+      break;
+  }
+
+  lives = 3;
+  score = 0;
+  document.getElementById("lives").innerText = lives;
+  document.getElementById("score").innerText = score;
+
+  // 문제 인덱스 배열 셔플
+  usedIndices = [...Array(problems.length).keys()];
+  shuffleArray(usedIndices);
+
+  currentIndex = 0;
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("gameScreen").classList.remove("hidden");
+  document.getElementById("endScreen").classList.add("hidden");
+
+  startTime = Date.now();
+  elapsedTimer = setInterval(updateElapsedTime, 1000);
+
+  showQuestion();
+}
+
+// 문제 표시
+function showQuestion() {
+  if(currentIndex >= problems.length) {
+    endGame();
+    return;
+  }
+  const qIdx = usedIndices[currentIndex];
+  const problem = problems[qIdx];
+
+  if(!infiniteTime) {
+    document.getElementById("energyContainer").classList.remove("hidden");
+  } else {
+    document.getElementById("energyContainer").classList.add("hidden");
+  }
+
+  barWidth = 100;
+  updateEnergyBar();
+
+  if(questionTimer) {
+    clearInterval(questionTimer);
+  }
+  if(!infiniteTime) {
+    questionTimer = setInterval(tickQuestionTime, 1000);
+  }
+
+  const qArea = document.getElementById("questionArea");
+  let html = "<div><b>문제</b>: " + problem.question + "</div><div>";
+  problem.choices.forEach((choice, idx) => {
+    html += "<div class='choice'><button onclick='submitAnswer("+idx+")'>("+(idx+1)+") "+choice+"</button></div>";
+  });
+  html += "</div>";
+
+  qArea.innerHTML = html;
+  document.getElementById("feedback").innerHTML = "";
+}
+
+// 정답 제출
+function submitAnswer(choiceIndex) {
+  const qIdx = usedIndices[currentIndex];
+  const correctIndex = problems[qIdx].correct;
+
+  if(questionTimer) {
+    clearInterval(questionTimer);
+    questionTimer = null;
+  }
+
+  let fb = document.getElementById("feedback");
+  if(choiceIndex === correctIndex) {
+    score += scorePerQuestion;
+    fb.innerHTML = "<b>정답입니다!</b>";
+  } else {
+    lives--;
+    fb.innerHTML = "<b>틀렸습니다!</b> 정답은 (" + (correctIndex+1) + ") " + problems[qIdx].choices[correctIndex];
+  }
+
+  document.getElementById("score").innerText = score;
+  document.getElementById("lives").innerText = lives;
+
+  if(lives <= 0) {
+    endGame();
+    return;
+  }
+
+  // 다음문제 버튼
+  const nextBtn = document.createElement("button");
+  nextBtn.textContent = "다음문제";
+  nextBtn.onclick = function() {
+    currentIndex++;
+    showQuestion();
+  };
+  fb.appendChild(document.createElement("br"));
+  fb.appendChild(nextBtn);
+}
+
+// 문제 제한시간(에너지바) 감소
+function tickQuestionTime() {
+  const step = 100 / questionTimeLimit;
+  barWidth -= step;
+  if(barWidth < 0) {
+    barWidth = 0;
+    clearInterval(questionTimer);
+    questionTimer = null;
+    lives--;
+    document.getElementById("feedback").innerHTML =
+      "<b>시간이 다 되었습니다!</b> => 기회 1 감소";
+    document.getElementById("lives").innerText = lives;
+    if(lives <= 0) {
+      endGame();
+      return;
+    }
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "다음문제";
+    nextBtn.onclick = function() {
+      currentIndex++;
+      showQuestion();
+    };
+    document.getElementById("feedback").appendChild(document.createElement("br"));
+    document.getElementById("feedback").appendChild(nextBtn);
+  }
+  updateEnergyBar();
+}
+
+// 에너지바 갱신
+function updateEnergyBar() {
+  const barFill = document.getElementById("energyBarFill");
+  barFill.style.width = barWidth + "%";
+}
+
+// 전체 경과시간 표시
+function updateElapsedTime() {
+  const now = Date.now();
+  const diffSec = Math.floor((now - startTime)/1000);
+  document.getElementById("elapsed").innerText = diffSec;
+}
+
+// 게임 종료
+function endGame() {
+  if(elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+  if(questionTimer) {
+    clearInterval(questionTimer);
+    questionTimer = null;
+  }
+
+  document.getElementById("gameScreen").classList.add("hidden");
+  document.getElementById("endScreen").classList.remove("hidden");
+
+  document.getElementById("finalScore").innerText = score;
+  const now = Date.now();
+  const diffSec = Math.floor((now - startTime)/1000);
+  document.getElementById("finalTime").innerText = diffSec;
+}
+
+// 점수 전송
+function sendScore() {
+  const now = Date.now();
+  const diffSec = Math.floor((now - startTime)/1000);
+  saveData("삼차방정식의 근과 계수와의 관계, 켤레근", playerName, score, diffSec);
+}
+
+// 서버로 데이터 전송
+async function saveData(game, name, score, elapsedTime) {
+  const FUNCTION_URL = "https://us-central1-record-f420d.cloudfunctions.net/report";
+  const requestData = {
+    game,
+    name,
+    score: parseInt(score, 10),
+    elapsedTime: parseInt(elapsedTime, 10)
+  };
+
+  try {
+    const response = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
+    });
+
+    const responseData = await response.json();
+    if (response.ok) {
+      document.getElementById('response').innerText =
+        "성공: " + JSON.stringify(responseData, null, 2);
+    } else {
+      document.getElementById('response').innerText =
+        "오류: " + JSON.stringify(responseData, null, 2);
+    }
+  } catch (error) {
+    console.error('요청 실패:', error);
+    document.getElementById('response').innerText =
+      "네트워크 오류: " + error.message;
+  }
+}
+
+// 배열 셔플
+function shuffleArray(arr) {
+  for(let i = arr.length - 1; i > 0; i--){
+    const r = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[r]] = [arr[r], arr[i]];
+  }
+}
+</script>
+</body>
+</html>
